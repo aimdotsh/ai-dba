@@ -1,0 +1,15 @@
+# Time: 2026-10-17T10:00:01.123456Z
+# User@Host: app[app] @  [10.0.1.5]
+# Query_time: 12.345678  Lock_time: 0.000123 Rows_sent: 100  Rows_examined: 2847392
+SET timestamp=1760685601;
+SELECT o.id, o.total, c.name FROM orders o JOIN customers c ON o.customer_id = c.id WHERE o.created_at > '2026-01-01' ORDER BY o.total DESC LIMIT 100;
+# Time: 2026-10-17T10:00:15.654321Z
+# User@Host: app[app] @  [10.0.1.5]
+# Query_time: 8.210987  Lock_time: 0.000098 Rows_sent: 1  Rows_examined: 1523000
+SET timestamp=1760685615;
+SELECT COUNT(*) FROM order_items WHERE product_id IN (SELECT id FROM products WHERE category = 'electronics');
+# Time: 2026-10-17T10:01:02.111222Z
+# User@Host: report[report] @  [10.0.1.8]
+# Query_time: 5.678901  Lock_time: 0.000234 Rows_sent: 5000  Rows_examined: 890000
+SET timestamp=1760685662;
+SELECT * FROM user_logs WHERE action = 'login' AND created_at BETWEEN '2026-10-01' AND '2026-10-17';
