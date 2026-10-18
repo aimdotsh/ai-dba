@@ -1,0 +1,30 @@
+# Time: 2026-10-18T14:02:11.482913Z
+# User@Host: app[app] @  [10.0.1.15]
+# Query_time: 18.742031  Lock_time: 0.000214 Rows_sent: 50  Rows_examined: 5218400
+SET timestamp=1760798531;
+SELECT o.id, o.order_no, o.total_amount, c.username, c.phone FROM orders o LEFT JOIN customers c ON o.customer_id = c.id WHERE o.status = 'paid' AND o.created_at >= '2026-09-01' ORDER BY o.total_amount DESC LIMIT 50;
+# Time: 2026-10-18T14:02:33.109284Z
+# User@Host: app[app] @  [10.0.1.15]
+# Query_time: 11.305678  Lock_time: 0.000098 Rows_sent: 1  Rows_examined: 3102450
+SET timestamp=1760798553;
+SELECT COUNT(*) AS cnt, DATE(created_at) AS d FROM order_items WHERE product_id IN (SELECT id FROM products WHERE category_id IN (SELECT id FROM categories WHERE name LIKE '%phone%')) GROUP BY d ORDER BY d;
+# Time: 2026-10-18T14:03:01.774512Z
+# User@Host: report[report] @  [10.0.1.20]
+# Query_time: 9.881234  Lock_time: 0.001542 Rows_sent: 20000  Rows_examined: 1980000
+SET timestamp=1760798581;
+SELECT * FROM user_login_logs WHERE login_time BETWEEN '2026-10-01 00:00:00' AND '2026-10-18 23:59:59' AND result = 'success';
+# Time: 2026-10-18T14:03:44.203948Z
+# User@Host: app[app] @  [10.0.1.16]
+# Query_time: 7.452109  Lock_time: 0.000076 Rows_sent: 10  Rows_examined: 1250800
+SET timestamp=1760798624;
+SELECT p.id, p.name, p.price, s.stock FROM products p JOIN inventory s ON p.id = s.product_id WHERE p.name LIKE '%wireless%' ORDER BY p.price ASC LIMIT 10;
+# Time: 2026-10-18T14:04:12.556731Z
+# User@Host: cron[cron] @  [10.0.1.30]
+# Query_time: 6.120483  Lock_time: 2.340211 Rows_sent: 0  Rows_examined: 890000
+SET timestamp=1760798652;
+UPDATE orders SET status = 'expired' WHERE status = 'pending' AND created_at < DATE_SUB(NOW(), INTERVAL 30 MINUTE);
+# Time: 2026-10-18T14:05:03.891204Z
+# User@Host: app[app] @  [10.0.1.15]
+# Query_time: 4.903217  Lock_time: 0.000054 Rows_sent: 100  Rows_examined: 640500
+SET timestamp=1760798703;
+SELECT DISTINCT user_id FROM user_coupons WHERE coupon_id = 1024 AND used = 0 ORDER BY RAND() LIMIT 100;
