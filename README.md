@@ -1,48 +1,49 @@
-# 铁皮上的 AI DBA
+# AI DBA on Bare Metal
 
-把 MySQL 慢日志（或 DBCheck 采集包）丢进去，跑在**你自己铁皮上**的 open-weight 模型输出诊断结论 + 可执行 SQL。
+Feed it a MySQL slow query log (or a DBCheck collection package), and an open-weight model running on **your own hardware** returns a diagnosis + executable SQL.
 
-## 为什么是"铁皮上"？
+## Why "Bare Metal"?
 
-- **数据不出内网**：慢日志里全是业务 SQL，调公有云 API 等于把库结构裸奔。模型跑在自己的机器上，日志不出机房。
-- **成本可控**：一次部署，无限次诊断，不按 token 挨刀。
-- **DBA 味**：prompt 按资深 DBA 的诊断路径写——先定根因，再给可执行 SQL，最后风险提示。不废话。
+- **Data never leaves your network**: slow logs are full of business SQL. Calling a public cloud API means shipping your schema to someone else's servers. With the model on your own box, logs stay in your datacenter.
+- **Predictable cost**: deploy once, diagnose unlimited times, no per-token billing.
+- **DBA-grade output**: the prompt follows a senior DBA's diagnostic path — root cause first, then executable SQL, then a risk note. No fluff.
 
-## 快速开始
+## Quick Start
 
 ```bash
-# 1. 起一个 vLLM（或任何 OpenAI 兼容接口）
-# 2. 跑
+# 1. Start vLLM (or any OpenAI-compatible endpoint)
+# 2. Run
 python aidba.py --slowlog /var/log/mysql/slow.log
 
-# 指定接口和模型
+# Point at your endpoint and model
 python aidba.py --slowlog slow.log \
-  --api-base http://你的IP:8100/v1 \
+  --api-base http://YOUR-IP:8100/v1 \
   --model deepseek-v4
 
-# 从 DBCheck 采集包读
+# Read from a DBCheck collection package
 python aidba.py --dbcheck-report report.json
 ```
 
-环境变量：`AIDBA_API_BASE`、`AIDBA_MODEL`、`OPENAI_API_KEY`（内网一般不需要）。
+Env vars: `AIDBA_API_BASE`, `AIDBA_MODEL`, `OPENAI_API_KEY` (usually unneeded on-prem).
 
-## 输出示例
+## Sample Output
 
 ```
 ============================================================
-1. 诊断结论
-orders 表 284 万行全表扫描，created_at 上没有索引，
-ORDER BY total 触发 filesort。
+1. Diagnosis
+Full table scan on 2.84M rows in orders, no index on created_at,
+ORDER BY total triggers filesort.
 
-2. 可执行 SQL
+2. Executable SQL
 ALTER TABLE orders ADD INDEX idx_created_at (created_at);
 
-3. 风险提示
-大表加索引会锁表，业务低峰期执行，或用 pt-online-schema-change。
+3. Risk Note
+Adding an index on a large table locks it; run during off-peak
+hours or use pt-online-schema-change.
 ============================================================
 ```
 
-## 文件
+## Files
 
-- `aidba.py` — 主程序（零依赖，只用标准库）
-- `sample-slow.log` — 示例慢日志，跑 `python aidba.py --slowlog sample-slow.log` 试试
+- `aidba.py` — main program (stdlib only, zero dependencies)
+- `sample-slow.log` — sample slow log, try `python aidba.py --slowlog sample-slow.log`
