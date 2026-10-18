@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
-AI DBA - 铁皮上的 AI DBA
-把 MySQL 慢日志丢进去，open-weight 模型输出诊断结论 + 可执行 SQL。
+AI DBA - AI DBA on Bare Metal
+Feed it a MySQL slow query log, get diagnosis + executable SQL
+from an open-weight model running on YOUR hardware.
 
-用法:
+Usage:
     python aidba.py --slowlog slow.log
     python aidba.py --slowlog slow.log --api-base http://9.7.130.151:8100/v1
     python aidba.py --dbcheck-report report.json
 
-数据不出内网：模型跑在你自己的铁皮上。
+Data never leaves your network: the model runs on your own iron.
 """
 import argparse
 import json
@@ -18,20 +19,21 @@ import sys
 import urllib.request
 
 
-SYSTEM_PROMPT = """你是资深 MySQL DBA。用户给你 MySQL 慢日志片段，
-请输出:
-1. 诊断结论（1-3 句话，直说问题根因）
-2. 可执行的 SQL（修复索引/改写查询/调整参数，三选一，给出具体语句）
-3. 风险提示（一句话）
+SYSTEM_PROMPT = """You are a senior MySQL DBA. The user gives you
+MySQL slow log excerpts. Output:
+1. Diagnosis (1-3 sentences, state the root cause directly)
+2. Executable SQL (fix the index / rewrite the query / tune a
+   parameter — pick one, give the exact statement)
+3. Risk note (one sentence)
 
-用中文回答，SQL 用代码块。不要废话。"""
+Answer in English, wrap SQL in code blocks. No fluff."""
 
 
 def parse_slowlog(path, limit=5):
-    """提取慢日志里最慢的几条查询。"""
+    """Extract the slowest queries from a MySQL slow log."""
     with open(path, errors="ignore") as f:
         content = f.read()
-    # 按 # Time: 切分
+    # Split on "# Time:" markers
     blocks = re.split(r"# Time:", content)
     queries = []
     for b in blocks[1:]:
@@ -41,7 +43,7 @@ def parse_slowlog(path, limit=5):
         )
         if qt and sql_m:
             sql = sql_m.group(1).strip()
-            # 跳过管理语句
+            # Skip admin statements
             if re.match(r"(?i)^(use |set |select \* from information_schema)",
                         sql):
                 continue
@@ -51,11 +53,11 @@ def parse_slowlog(path, limit=5):
 
 
 def parse_dbcheck_report(path, limit=5):
-    """从 DBCheck 采集包 JSON 里提取慢查询/告警。"""
+    """Extract slow queries / alerts from a DBCheck collection JSON."""
     with open(path) as f:
         data = json.load(f)
     items = []
-    # 兼容多种字段名
+    # Tolerate several field namings
     for key in ("slow_queries", "slowQueries", "top_slow_sql"):
         if key in data:
             for q in data[key][:limit]:
@@ -71,8 +73,8 @@ def parse_dbcheck_report(path, limit=5):
 
 
 def call_llm(api_base, model, slow_queries):
-    """调 OpenAI 兼容接口（vLLM）。"""
-    prompt = "慢日志 Top SQL:\n\n"
+    """Call an OpenAI-compatible endpoint (vLLM)."""
+    prompt = "Top slow SQL from slow log:\n\n"
     for i, (qt, sql) in enumerate(slow_queries, 1):
         prompt += f"--- SQL #{i} (Query_time: {qt}s) ---\n{sql[:2000]}\n\n"
 
@@ -91,7 +93,7 @@ def call_llm(api_base, model, slow_queries):
         data=payload,
         headers={"Content-Type": "application/json"},
     )
-    # 内网模型一般不需要 key；如需，设 OPENAI_API_KEY 环境变量
+    # On-prem models usually need no key; set OPENAI_API_KEY if yours does
     api_key = os.environ.get("OPENAI_API_KEY", "")
     if api_key:
         req.add_header("Authorization", f"Bearer {api_key}")
@@ -102,17 +104,18 @@ def call_llm(api_base, model, slow_queries):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="铁皮上的 AI DBA")
-    ap.add_argument("--slowlog", help="MySQL 慢日志文件路径")
-    ap.add_argument("--dbcheck-report", help="DBCheck 采集包 JSON 路径")
+    ap = argparse.ArgumentParser(description="AI DBA on Bare Metal")
+    ap.add_argument("--slowlog", help="Path to MySQL slow query log")
+    ap.add_argument("--dbcheck-report",
+                    help="Path to DBCheck collection package JSON")
     ap.add_argument("--api-base", default=os.environ.get(
         "AIDBA_API_BASE", "http://9.7.130.151:8100/v1"),
-        help="vLLM OpenAI 兼容接口地址")
+        help="vLLM OpenAI-compatible endpoint")
     ap.add_argument("--model", default=os.environ.get(
         "AIDBA_MODEL", "deepseek-v4"),
-        help="模型名")
+        help="Model name")
     ap.add_argument("--limit", type=int, default=3,
-                    help="分析几条最慢的 SQL")
+                    help="How many of the slowest SQL to analyze")
     args = ap.parse_args()
 
     if args.slowlog:
@@ -120,18 +123,19 @@ def main():
     elif args.dbcheck_report:
         queries = parse_dbcheck_report(args.dbcheck_report, args.limit)
     else:
-        ap.error("必须指定 --slowlog 或 --dbcheck-report")
+        ap.error("must specify --slowlog or --dbcheck-report")
 
     if not queries:
-        print("没解析到慢查询，检查文件格式。", file=sys.stderr)
+        print("No slow queries parsed, check the file format.",
+              file=sys.stderr)
         sys.exit(1)
 
-    print(f"解析到 {len(queries)} 条慢查询，送模型诊断...\n")
+    print(f"Parsed {len(queries)} slow queries, sending to model...\n")
     print("=" * 60)
     result = call_llm(args.api_base, args.model, queries)
     print(result)
     print("=" * 60)
-    print("\n[AI DBA] 诊断完成。数据未离开内网。")
+    print("\n[AI DBA] Diagnosis complete. Data never left your network.")
 
 
 if __name__ == "__main__":
