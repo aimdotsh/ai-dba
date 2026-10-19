@@ -100,7 +100,10 @@ def call_llm(api_base, model, slow_queries):
 
     with urllib.request.urlopen(req, timeout=120) as resp:
         result = json.load(resp)
-    return result["choices"][0]["message"]["content"]
+    text = result["choices"][0]["message"]["content"]
+    # Strip reasoning traces (<think>...</think>) from reasoning models
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
+    return text
 
 
 def main():
